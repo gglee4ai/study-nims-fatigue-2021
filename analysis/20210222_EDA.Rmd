@@ -1,0 +1,224 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+#library(tidyverse)
+library(tidymodels)
+```
+
+
+```{r}
+df0 <- readr::read_csv("../input/2193-9772-3-8-s1.csv")
+df0
+```
+
+
+```{r}
+df1 <- 
+  df0 %>% 
+  select(-1)
+df1
+```
+
+
+```{r}
+plot(df0$Fatigue)
+```
+
+```{r}
+rf_mod <-
+  rand_forest(trees = 1000) %>% 
+  set_engine("ranger") %>% 
+  set_mode("regression")
+```
+
+
+```{r}
+set.seed(234)
+rf_fit <-
+  rf_mod %>% 
+  fit(Fatigue ~ ., data = df1)
+rf_fit
+```
+
+
+```{r}
+set.seed(345)
+folds <- vfold_cv(df1, v = 10)
+folds
+```
+
+
+```{r}
+rf_wf <-
+  workflow() %>% 
+  add_model(rf_mod) %>% 
+  add_formula(Fatigue ~ .)
+
+set.seed(456)
+rf_fit_rs <-
+  rf_wf %>% 
+  fit_resamples(folds)
+```
+
+
+```{r}
+collect_metrics(rf_fit_rs)
+```
+
+```{r}
+compositions <-
+  df1 %>% 
+  select(C, Si, Mn, P, S, Ni, Cr, Cu, Mo)
+```
+
+
+```{r}
+compositions %>% 
+  distinct()
+```
+
+
+```{r}
+clusters <- tibble(n = 2:nrow(distinct(compositions)))
+clusters
+```
+
+```{r}
+clusters <-
+  clusters %>% 
+  mutate(k = map(n, function(n) { kmeans(compositions, centers = n) }))
+clusters
+```
+
+
+```{r}
+clusters %>% 
+  mutate(ss = map_dbl(k, ~.x$tot.withinss)) %>% 
+  ggplot(aes(n, ss)) +
+  geom_point() +
+  geom_line() +
+  scale_x_continuous(limits = c(0, 50))
+```
+
+
+```{r}
+df1
+```
+
+```{r}
+processes <- 
+  df1 %>% 
+  select(1:12)
+processes
+```
+
+```{r}
+processes %>% 
+  distinct()
+```
+
+
+조성만으로 평가하는 경우, 
+
+```{r}
+set.seed(234)
+rf_fit <-
+  rf_mod %>% 
+  fit(Fatigue ~ C + Si + Mn + P + S + Ni + Cr + Cu + Mo, data = df1)
+rf_fit
+```
+
+
+## 주응력 분석
+
+
+```{r}
+S <- cov(compositions)
+```
+
+
+```{r}
+comp_pca <- prcomp(compositions)
+comp_pca
+```
+
+
+
+```{r}
+comp_pca_scaled <- prcomp(compositions, scale = TRUE)
+comp_pca_scaled
+```
+
+
+```{r}
+par(mfrow = c(1, 2))
+screeplot(comp_pca, type="l", npcs = length(comp_pca$sdev))
+screeplot(comp_pca_scaled, type="l", npcs = length(comp_pca$sdev))
+```
+
+
+
+```{r}
+screeplot(comp_pca_scaled, type="l", npcs = length(comp_pca$sdev))
+```
+
+
+```{r}
+summary(comp_pca)
+```
+
+
+
+```{r}
+summary(comp_pca_scaled)
+```
+
+
+
+```{r}
+df2 <-
+  df1 %>% 
+  group_by(NT, THT, THt, THQCr, CT, Ct, DT, Dt, QmT, TT, Tt, TCr) %>% 
+  nest() %>% 
+  rowid_to_column(var = "process") %>% 
+  mutate(ndata = map_int(data, nrow)) %>% 
+  relocate(process, ndata) %>% 
+  unnest(cols = c(data)) %>% 
+  ungroup()
+```
+
+
+```{r}
+df2 %>% 
+  filter(process == 1) %>% 
+  select(C:Mo) %>% 
+  trunc_mat(n = 100)
+```
+
+
+
+```{r}
+set.seed(234)
+rf_fit <-
+  rf_mod %>% 
+  fit(Fatigue ~ NT + THT + THt + THQCr + CT + Ct + DT + Dt + QmT + TT + Tt + TCr, 
+      data = df1)
+rf_fit
+```
+
+
+
+```{r}
+set.seed(234)
+rf_fit <-
+  rf_mod %>% 
+  fit(Fatigue ~ NT + THT + THt + THQCr + CT + Ct + DT + Dt + QmT + TT + Tt + TCr +
+        C + Si + Mn + P + S + Ni + Cr + Cu + Mo, 
+      data = df1)
+rf_fit
+```
+
