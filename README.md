@@ -1,2 +1,3 @@
-# R-nims-fatigue-2014
-NIMS Fatigue machine learning
+# study-nims-fatigue-2021
+NIMS Fatigue 결과를 machine learning 이용해서 재현
+
